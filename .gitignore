@@ -1,0 +1,8 @@
+# Documentation not tracked in version control
+running.md
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+*.pyo
+TODO*
