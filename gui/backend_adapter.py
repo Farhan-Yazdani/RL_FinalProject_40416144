@@ -40,12 +40,24 @@ None of this replaces ``experiments/run_experiments.py`` for actual
 reported results -- it is a real-time *visualization* of the same
 algorithms, useful for demoing/debugging, while the authoritative,
 reproducible numbers still come from the batch CLI scripts writing to
-``results/`` (``CODING_STYLE.md`` 1.8).
+``results/``.
+
+This module also discovers and loads previously-completed batch runs
+(:func:`list_model_run_ids`, :func:`load_model_arrays`,
+:func:`apply_loaded_arrays`), so a session can be built from a
+*trained* Q/V/policy array instead of always starting from zero.
+Discovery and array-loading read only ``results/models/``; the one
+exception is :func:`load_run_config`, which reads
+``results/raw_data/<algorithm>/<run_id>/config.json`` -- see that
+function's docstring for exactly why that's unavoidable with the
+current file layout.
 """
 from __future__ import annotations
 
+import json
 import threading
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -137,6 +149,147 @@ def build_environment(config: BackendConfig) -> MazeEnv:
     env = MazeEnv(map_spec, env_config, rng)
     env.reset()
     return env
+
+
+MODELS_ROOT = Path("results/models")
+RAW_DATA_ROOT = Path("results/raw_data")
+
+
+def list_model_run_ids(algorithm: str, models_root: Path = MODELS_ROOT) -> list:
+    """List completed run-ids with saved model arrays for ``algorithm``.
+
+    Parameters
+    ----------
+    algorithm : str
+        One of ``"value_iteration"``, ``"q_learning"``, ``"sarsa_lambda"``
+        (matches the sub-directory name under ``models_root``).
+    models_root : pathlib.Path, default=Path("results/models")
+        Root of the saved-model directory tree.
+
+    Returns
+    -------
+    list of str
+        Sorted run-ids (sub-directory names) that contain at least one
+        ``.npy`` file. Reads **only** ``results/models/`` -- no other
+        directory is touched by this function.
+    """
+    algo_dir = models_root / algorithm
+    if not algo_dir.exists():
+        return []
+    run_ids = []
+    for run_dir in sorted(algo_dir.iterdir()):
+        if run_dir.is_dir() and any(run_dir.glob("*.npy")):
+            run_ids.append(run_dir.name)
+    return run_ids
+
+
+def load_model_arrays(algorithm: str, run_id: str, models_root: Path = MODELS_ROOT) -> dict:
+    """Load every saved ``.npy`` array for one completed run.
+
+    Parameters
+    ----------
+    algorithm : str
+        Sub-directory under ``models_root`` (see :func:`list_model_run_ids`).
+    run_id : str
+        Run identifier (matches a sub-directory name).
+    models_root : pathlib.Path, default=Path("results/models")
+        Root of the saved-model directory tree.
+
+    Returns
+    -------
+    dict of str -> ndarray
+        Keyed by filename stem (e.g. ``"V"``, ``"policy"``, ``"Q"``).
+        Reads **only** ``results/models/<algorithm>/<run_id>/`` -- no
+        other directory is touched by this function.
+    """
+    run_dir = models_root / algorithm / run_id
+    arrays = {}
+    for npy_path in run_dir.glob("*.npy"):
+        arrays[npy_path.stem] = np.load(npy_path)
+    return arrays
+
+
+def load_run_config(algorithm: str, run_id: str, raw_data_root: Path = RAW_DATA_ROOT) -> Optional[dict]:
+    """Load a completed run's resolved config (map, hyperparameters, ...).
+
+    Parameters
+    ----------
+    algorithm : str
+        Sub-directory under ``raw_data_root``.
+    run_id : str
+        Run identifier.
+    raw_data_root : pathlib.Path, default=Path("results/raw_data")
+        Root of the raw-data directory tree.
+
+    Returns
+    -------
+    dict or None
+        Parsed ``config.json`` contents, or ``None`` if it doesn't
+        exist for this run.
+
+    Notes
+    -----
+    **This is the one function in this module that reads outside**
+    ``results/models/``. The array files under ``results/models/``
+    contain only the bare learned numbers (V/Q/policy) -- no record of
+    which map, hyperparameters, or reward version produced them (and
+    that information is not recoverable from the arrays: array
+    *shape* does encode ``maze_size``/``max_energy``, since those set
+    the array dimensions, but *which map* -- ``source`` vs.
+    ``transfer_similar`` vs. ``transfer_different``, all the same
+    size -- and every hyperparameter (alpha, gamma, epsilon schedule,
+    lambda, reward version, ...) leaves no trace in the array shape at
+    all). That information only exists in
+    ``results/raw_data/<algorithm>/<run_id>/config.json``, written by
+    the corresponding batch CLI script. Importing a learned model into
+    a *matching* environment, and displaying the hyperparameters it
+    was actually trained with, both require reading it. If a strict
+    "results/models/ only" data source is wanted in a future revision,
+    the relevant subset of this config would need to be duplicated
+    into ``results/models/`` at save time instead.
+    """
+    config_path = raw_data_root / algorithm / run_id / "config.json"
+    if not config_path.exists():
+        return None
+    with open(config_path) as f:
+        return json.load(f)
+
+
+def apply_loaded_arrays(session, algorithm: str, arrays: dict) -> None:
+    """Overwrite a freshly-constructed session's arrays with loaded ones.
+
+    Parameters
+    ----------
+    session : QLearningSession | SarsaLambdaSession | ValueIterationSession
+        A session just constructed the normal (zero-initialized) way.
+    algorithm : str
+        Which kind of session ``session`` is (selects which attributes
+        to overwrite).
+    arrays : dict of str -> ndarray
+        Output of :func:`load_model_arrays`.
+
+    Notes
+    -----
+    For :class:`ValueIterationSession`, this also sets
+    ``is_converged = True`` so the session skips straight to a greedy
+    rollout of the loaded policy instead of running a fresh sweep --
+    the whole point of importing a saved run is to *not* recompute it.
+    For :class:`QLearningSession`/:class:`SarsaLambdaSession`, only
+    ``Q`` needs overwriting: :meth:`policy`/:meth:`value_function`
+    already derive from ``self.Q`` on demand, so nothing else needs to
+    change for those to reflect the loaded model.
+    """
+    if algorithm == "value_iteration":
+        if "V" in arrays:
+            session.V = arrays["V"]
+        if "policy" in arrays:
+            session.policy_array = arrays["policy"]
+        if "Q" in arrays:
+            session.Q = arrays["Q"]
+        session.is_converged = True
+    else:
+        if "Q" in arrays:
+            session.Q = arrays["Q"]
 
 
 def _render_state(env: MazeEnv) -> MazeRenderState:
