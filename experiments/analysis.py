@@ -247,6 +247,143 @@ def visitation_count_from_events(events_log_path, state_space_shape) -> np.ndarr
     return counts
 
 
+def condense_events_log(events_log_path, condensed_path) -> list:
+    """Write a compact per-episode summary of a full ``events.log``.
+
+    A full ``events.log`` (one JSON line per environment step) grows to
+    ~130 MB for an 8000-episode run (see ``results/raw_data``). This
+    function rewrites it as one JSON line *per episode*, aggregating the
+    repetitive move-level events into counters and keeping only the
+    sparse, decision-relevant events as a time-stamped list. The output
+    is typically < 1 MB and is small enough to track in git, so the
+    analytical tools (convergence timing, event distributions, wall
+    collision trends) work on a reproducible artifact instead of the
+    multi-hundred-MB raw log.
+
+    Parameters
+    ----------
+    events_log_path : str or pathlib.Path
+        Path to the full ``events.log`` (one JSON object per line, as
+        written by ``agents/q_learning.py`` / ``agents/sarsa_lambda.py``).
+    condensed_path : str or pathlib.Path
+        Where to write the condensed JSON-lines log.
+
+    Returns
+    -------
+    list of dict
+        The condensed per-episode records (also written to
+        ``condensed_path``). Each record has the form::
+
+            {"episode": int, "n_steps": int,
+             "events": {"normal_move": int, "wall_collision": int,
+                        "penalty_cell": int, "door_blocked": int,
+                        "energy_depleted": int},
+             "notable": [{"step": int, "event": "key_obtained" | "door_passed"
+                          | "goal_reached"}, ...]}
+
+        ``n_steps`` is the total number of logged steps in the episode;
+        ``notable`` preserves the exact step index of each key / door /
+        goal event, which is exactly the "minimum loggable events" trail
+        the full log exists for. The ``events`` counters keep the
+        remaining event types with full per-episode fidelity.
+    """
+    condensed = []
+    current = None
+    with open(events_log_path) as f:
+        for line in f:
+            row = json.loads(line)
+            episode = row["episode"]
+            if current is None or current["episode"] != episode:
+                if current is not None:
+                    condensed.append(current)
+                current = {
+                    "episode": episode,
+                    "n_steps": 0,
+                    "events": {
+                        "normal_move": 0,
+                        "wall_collision": 0,
+                        "penalty_cell": 0,
+                        "door_blocked": 0,
+                        "energy_depleted": 0,
+                    },
+                    "notable": [],
+                }
+            current["n_steps"] += 1
+            event = row["event"]
+            if event in current["events"]:
+                current["events"][event] += 1
+            else:
+                current["notable"].append({"step": row["step"], "event": event})
+    if current is not None:
+        condensed.append(current)
+
+    with open(condensed_path, "w") as f:
+        for record in condensed:
+            f.write(json.dumps(record) + "\n")
+    return condensed
+
+
+def load_condensed_events(condensed_path) -> list:
+    """Load a condensed events log written by :func:`condense_events_log`.
+
+    Parameters
+    ----------
+    condensed_path : str or pathlib.Path
+        Path to a ``condensed_events.log`` file.
+
+    Returns
+    -------
+    list of dict
+        Per-episode records in episode order (see
+        :func:`condense_events_log` for the schema).
+    """
+    records = []
+    with open(condensed_path) as f:
+        for line in f:
+            records.append(json.loads(line))
+    return records
+
+
+def condensed_convergence_metrics(condensed: list, first_goal_only: bool = True) -> dict:
+    """Summarize the learning timeline encoded in a condensed events log.
+
+    Parameters
+    ----------
+    condensed : list of dict
+        Records from :func:`load_condensed_events` (episode order).
+    first_goal_only : bool, default=True
+        If ``True`` (default), only episodes that end by reaching the
+        goal are counted toward ``goal_episodes``.
+
+    Returns
+    -------
+    dict
+        ``"first_goal_episode"`` (first episode containing a
+        ``goal_reached`` event, or None), ``"goal_episodes"`` (number
+        of episodes that reached the goal), ``"depleted_episodes"``
+        (episodes ending in energy depletion), and ``"total_wall_collisions"``
+        (sum of wall collisions over all episodes).
+    """
+    first_goal_episode = None
+    goal_episodes = 0
+    depleted_episodes = 0
+    total_wall_collisions = 0
+    for record in condensed:
+        event_names = {item["event"] for item in record["notable"]}
+        if "goal_reached" in event_names:
+            goal_episodes += 1
+            if first_goal_episode is None:
+                first_goal_episode = record["episode"]
+        depleted_episodes += record["events"]["energy_depleted"]
+        total_wall_collisions += record["events"]["wall_collision"]
+    return {
+        "first_goal_episode": first_goal_episode,
+        "goal_episodes": goal_episodes,
+        "depleted_episodes": depleted_episodes,
+        "total_wall_collisions": total_wall_collisions,
+    }
+
+
 def reachable_states_mask(visitation_counts: np.ndarray, min_visits: int = 1) -> np.ndarray:
     """Boolean mask of states visited at least ``min_visits`` times during training.
 

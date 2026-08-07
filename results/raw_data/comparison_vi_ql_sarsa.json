@@ -1,0 +1,36 @@
+{
+  "vi_runtime_seconds": 17.232414499972947,
+  "vi_n_iterations": 266,
+  "q_learning_vs_vi": {
+    "agreement_fraction": 0.41998961081568764,
+    "reachable_states_analysis": {
+      "n_reachable_states": 109345,
+      "agreement_fraction_reachable_only": 0.4878595271845992
+    },
+    "runtime_seconds": 57.130058300099336,
+    "n_samples": 924117,
+    "memory_bytes": 5515200,
+    "path_quality": {
+      "avg_steps_on_success": 56.86,
+      "success_rate": 1.0,
+      "avg_wall_collisions": 2.76,
+      "avg_penalty_entries": 0.44
+    }
+  },
+  "sarsa_vs_vi": {
+    "agreement_fraction": 0.3623091329132093,
+    "reachable_states_analysis": {
+      "n_reachable_states": 113648,
+      "agreement_fraction_reachable_only": 0.389298535829931
+    },
+    "runtime_seconds": 76.46609900007024,
+    "n_samples": 796176,
+    "memory_bytes": 5515200,
+    "path_quality": {
+      "avg_steps_on_success": 63.6,
+      "success_rate": 1.0,
+      "avg_wall_collisions": 3.84,
+      "avg_penalty_entries": 0.52
+    }
+  }
+}

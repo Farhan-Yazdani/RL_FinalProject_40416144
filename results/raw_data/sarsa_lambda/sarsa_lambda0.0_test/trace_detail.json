@@ -1,0 +1,660 @@
+[
+  {
+    "step": 0,
+    "state": [
+      0,
+      0,
+      0,
+      382
+    ],
+    "action": 3,
+    "reward": 2.0,
+    "delta": 1.8369859760180027,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 1,
+    "state": [
+      1,
+      0,
+      0,
+      381
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": 2.3767350277568937,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 2,
+    "state": [
+      1,
+      1,
+      0,
+      380
+    ],
+    "action": 3,
+    "reward": 2.0,
+    "delta": -1.4807194937528472,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 3,
+    "state": [
+      2,
+      1,
+      0,
+      379
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 4.4930134214514394,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 4,
+    "state": [
+      3,
+      1,
+      0,
+      378
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": 2.8285133959105675,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 5,
+    "state": [
+      3,
+      2,
+      0,
+      377
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": -1.2325504370135434,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 6,
+    "state": [
+      3,
+      3,
+      0,
+      376
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": 5.232281646725323,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 7,
+    "state": [
+      3,
+      4,
+      0,
+      375
+    ],
+    "action": 1,
+    "reward": 2.0,
+    "delta": -0.12606728993297622,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 8,
+    "state": [
+      3,
+      5,
+      0,
+      374
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": -3.748202365111947,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 9,
+    "state": [
+      3,
+      6,
+      0,
+      373
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": -0.395367877556982,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 10,
+    "state": [
+      3,
+      7,
+      0,
+      372
+    ],
+    "action": 0,
+    "reward": 1.0,
+    "delta": 18.493457518218662,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 11,
+    "state": [
+      4,
+      7,
+      0,
+      371
+    ],
+    "action": 1,
+    "reward": -3.0,
+    "delta": -14.974177100937133,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 12,
+    "state": [
+      5,
+      7,
+      0,
+      370
+    ],
+    "action": 2,
+    "reward": 1.0,
+    "delta": 2.439733924558187,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 13,
+    "state": [
+      4,
+      7,
+      0,
+      369
+    ],
+    "action": 1,
+    "reward": -3.0,
+    "delta": 0.6060611800931319,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 14,
+    "state": [
+      3,
+      7,
+      0,
+      368
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": -0.821103386120754,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 15,
+    "state": [
+      4,
+      7,
+      0,
+      367
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": -0.8182662348589602,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 16,
+    "state": [
+      4,
+      8,
+      0,
+      366
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": 15.498183497063323,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 17,
+    "state": [
+      4,
+      9,
+      0,
+      365
+    ],
+    "action": 1,
+    "reward": 49.0,
+    "delta": 2.4642063166826134,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 18,
+    "state": [
+      4,
+      10,
+      1,
+      364
+    ],
+    "action": 0,
+    "reward": -3.0,
+    "delta": -0.24512494306190913,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 19,
+    "state": [
+      4,
+      9,
+      1,
+      363
+    ],
+    "action": 0,
+    "reward": -3.0,
+    "delta": -2.172364301754808,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 20,
+    "state": [
+      4,
+      8,
+      1,
+      362
+    ],
+    "action": 2,
+    "reward": -8.0,
+    "delta": -7.951483918875539,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 21,
+    "state": [
+      4,
+      8,
+      1,
+      361
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": -0.3394376735331259,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 22,
+    "state": [
+      4,
+      9,
+      1,
+      360
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": -1.3314652615482685,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 23,
+    "state": [
+      4,
+      10,
+      1,
+      359
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 0.1244089231722163,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 24,
+    "state": [
+      5,
+      10,
+      1,
+      358
+    ],
+    "action": 0,
+    "reward": -3.0,
+    "delta": -0.9620091571638829,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 25,
+    "state": [
+      5,
+      9,
+      1,
+      357
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 2.7024085570847847,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 26,
+    "state": [
+      6,
+      9,
+      1,
+      356
+    ],
+    "action": 0,
+    "reward": -3.0,
+    "delta": -1.8939387849499796,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 27,
+    "state": [
+      5,
+      9,
+      1,
+      355
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 3.294380582632561,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 28,
+    "state": [
+      6,
+      9,
+      1,
+      354
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 0.40299390300911186,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 29,
+    "state": [
+      7,
+      9,
+      1,
+      353
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": 0.9907740444062165,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 30,
+    "state": [
+      7,
+      10,
+      1,
+      352
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 0.7800776239744538,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 31,
+    "state": [
+      8,
+      10,
+      1,
+      351
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": -0.7406589346784145,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 32,
+    "state": [
+      9,
+      10,
+      1,
+      350
+    ],
+    "action": 0,
+    "reward": -3.0,
+    "delta": -2.51039034375,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 33,
+    "state": [
+      9,
+      9,
+      1,
+      349
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": 9.845083324239328,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 34,
+    "state": [
+      9,
+      10,
+      1,
+      348
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 14.495611640515824,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 35,
+    "state": [
+      10,
+      10,
+      1,
+      347
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": 14.959881661040427,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 36,
+    "state": [
+      10,
+      11,
+      1,
+      346
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": -39.48511260447082,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 37,
+    "state": [
+      10,
+      12,
+      1,
+      345
+    ],
+    "action": 1,
+    "reward": -8.0,
+    "delta": 59.63537197801126,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 38,
+    "state": [
+      10,
+      12,
+      1,
+      344
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 33.24328972104871,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 39,
+    "state": [
+      11,
+      12,
+      1,
+      343
+    ],
+    "action": 1,
+    "reward": -3.0,
+    "delta": -80.20405067756373,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 40,
+    "state": [
+      10,
+      12,
+      1,
+      342
+    ],
+    "action": 0,
+    "reward": -3.0,
+    "delta": 16.184854595831432,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 41,
+    "state": [
+      9,
+      12,
+      1,
+      341
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 17.161133934693098,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 42,
+    "state": [
+      10,
+      12,
+      1,
+      340
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 35.767427664859554,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 43,
+    "state": [
+      11,
+      12,
+      1,
+      339
+    ],
+    "action": 1,
+    "reward": 1.0,
+    "delta": 11.778023564044076,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 44,
+    "state": [
+      11,
+      13,
+      1,
+      338
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 8.884412760642363,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 45,
+    "state": [
+      12,
+      13,
+      1,
+      337
+    ],
+    "action": 3,
+    "reward": 1.0,
+    "delta": 20.022062052860008,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  },
+  {
+    "step": 46,
+    "state": [
+      13,
+      13,
+      1,
+      336
+    ],
+    "action": 3,
+    "reward": 201.0,
+    "delta": 25.29887003934607,
+    "trace_norm": 1.0,
+    "trace_max": 1.0
+  }
+]

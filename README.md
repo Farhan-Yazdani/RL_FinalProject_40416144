@@ -161,12 +161,20 @@ initial/final success rate per scenario.
 
 ```bash
 python -m visualization.render_outputs \
-  --map-name source --algorithm value_iteration --run-id vi_matched_shaped \
-  --k 0 --energy 300
+  --map-name source --algorithm q_learning --run-id ql_test3
 ```
-(swap in your own `--algorithm`/`--run-id`/`--k`/`--energy`; output
-defaults to `results/figures/<algorithm>/<run_id>/`, or pass
-`--output-dir` to override).
+
+(swap in your own `--algorithm`/`--run-id`; output defaults to
+`results/figures/<algorithm>/<run_id>/`, or pass `--output-dir` to
+override).
+
+This writes a single 2x2 figure (`policy_and_value_k0_k1.png`): value
+heatmaps for `k=0`/`k=1` on the top row and policy arrows for
+`k=0`/`k=1` on the bottom row. Instead of one fixed energy slice, each
+`(x, y, k)` position uses the energy level visited most during
+training (from the run's `events.log`); positions without a
+visitation record fall back to `--energy`, which defaults to
+`max_energy // 2`.
 
 Other renderer functions available in `gui/renderer.py`:
 `render_visitation_map`, `render_policy_disagreement_map`,

@@ -88,6 +88,72 @@ def _visitation_counts_from_events_log(events_log_path, shape) -> Optional[np.nd
     return counts
 
 
+def _load_or_count_visitation(events_log_path, shape) -> Optional[np.ndarray]:
+    """Get per-state visitation counts, preferring the compact ``.npy`` artifact.
+
+    Training runs write a ``visitation_counts.npy`` next to their
+    ``events.log`` (see ``experiments.condense_events``). That compact
+    array (a few MB) is preferred over parsing the full multi-hundred-MB
+    ``events.log`` line by line, so deriving a policy stays fast and
+    works even when the raw log is absent (e.g. in a fresh clone that
+    only tracks the compact artifact). Falls back to counting from the
+    raw log only when no compact array exists.
+
+    Parameters
+    ----------
+    events_log_path : str or pathlib.Path or None
+        Path to the run's ``events.log`` (its directory is also where a
+        ``visitation_counts.npy`` would live). ``None`` means no
+        visitation information is available at all.
+    shape : tuple of int
+        ``(X, Y, 2, E+1)`` shape the counts array must have.
+
+    Returns
+    -------
+    ndarray of shape ``shape``, dtype=int64, or None
+        Per-state visitation counts, or ``None`` when neither the
+        compact array nor the raw events log is available.
+    """
+    if events_log_path is not None:
+        npy_path = Path(events_log_path).with_name("visitation_counts.npy")
+        if npy_path.exists():
+            counts = np.load(npy_path)
+            if counts.shape == tuple(shape):
+                return counts
+    return _visitation_counts_from_events_log(events_log_path, shape)
+
+
+def _compute_preferred_energy(Q: np.ndarray, visitation, default_energy: int) -> np.ndarray:
+    """Pick the energy level to consult for each ``(x, y, k)`` position.
+
+    Parameters
+    ----------
+    Q : ndarray of shape (X, Y, 2, E+1, A)
+        Q-table (used only for its spatial shape).
+    visitation : ndarray of shape (X, Y, 2, E+1), dtype=int64, or None
+        Per-state visitation counts (see
+        :func:`_visitation_counts_from_events_log`). ``None`` (or all
+        zeros) means no visitation information is available.
+    default_energy : int
+        Energy level to use for positions with no visitation record.
+
+    Returns
+    -------
+    ndarray of shape (X, Y, 2), dtype=int64
+        Per-position preferred energy level: the most-visited energy
+        when ``visitation`` data exists for that position, else
+        ``default_energy``.
+    """
+    n_x, n_y, n_k = Q.shape[:3]
+    if visitation is not None and visitation.sum() > 0:
+        preferred_energy = np.argmax(visitation, axis=-1)  # shape (X, Y, 2)
+        ever_visited = np.any(visitation > 0, axis=-1)     # shape (X, Y, 2)
+        preferred_energy = np.where(ever_visited, preferred_energy, default_energy)
+    else:
+        preferred_energy = np.full((n_x, n_y, n_k), default_energy, dtype=np.int64)
+    return preferred_energy
+
+
 def derive_policy_from_Q(
     Q: np.ndarray,
     events_log_path=None,
@@ -102,9 +168,11 @@ def derive_policy_from_Q(
     events_log_path : str or pathlib.Path, optional
         Path to the run's ``events.log``. When given, the trained
         energy row nearest to each position's *most-visited* energy
-        level is used. When omitted (or the file doesn't exist), every
-        position falls back to the trained row nearest
-        ``default_energy``.
+        level is used. The compact ``visitation_counts.npy`` artifact
+        written next to the log (see ``experiments.condense_events``)
+        is preferred over parsing the raw log when it exists; when
+        neither file is available, every position falls back to the
+        trained row nearest ``default_energy``.
     default_energy : int, optional
         Energy level to prefer when no visitation information is
         available for a position (or no events log is given at all).
@@ -148,17 +216,13 @@ def derive_policy_from_Q(
 
     visitation = None
     if events_log_path is not None:
-        visitation = _visitation_counts_from_events_log(events_log_path, (n_x, n_y, n_k, n_e))
+        visitation = _load_or_count_visitation(events_log_path, (n_x, n_y, n_k, n_e))
 
     # Preferred energy level per (x, y, k): the most-visited energy if
     # we have visitation data and the position was visited at all,
-    # else the global default_energy fallback.
-    if visitation is not None and visitation.sum() > 0:
-        preferred_energy = np.argmax(visitation, axis=-1)  # shape (X, Y, 2)
-        ever_visited = np.any(visitation > 0, axis=-1)      # shape (X, Y, 2)
-        preferred_energy = np.where(ever_visited, preferred_energy, default_energy)
-    else:
-        preferred_energy = np.full((n_x, n_y, n_k), default_energy, dtype=np.int64)
+    # else the global default_energy fallback (see
+    # _compute_preferred_energy).
+    preferred_energy = _compute_preferred_energy(Q, visitation, default_energy)
 
     policy = np.zeros((n_x, n_y, n_k, n_e), dtype=np.int64)
 
@@ -187,6 +251,77 @@ def derive_policy_from_Q(
                 policy[x, y, k, :] = action
 
     return policy
+
+
+def derive_v_and_policy_from_Q(
+    Q: np.ndarray,
+    events_log_path=None,
+    default_energy: Optional[int] = None,
+) -> tuple:
+    """Derive per-position ``(x, y, k)`` value and greedy policy from a Q-table.
+
+    Like :func:`derive_policy_from_Q`, but returns one value and one
+    greedy action *per position* (shape ``(X, Y, 2)``) instead of a
+    policy broadcast across the full energy axis -- exactly the two
+    2D-per-key-state panels a value-heatmap / policy-arrows figure
+    needs. For every ``(x, y, k)`` it consults the nearest *trained*
+    energy row to the position's preferred energy (most-visited, or
+    ``default_energy`` fallback) and reports ``max_a Q`` as the value
+    and ``argmax_a Q`` as the action there.
+
+    Parameters
+    ----------
+    Q : ndarray of shape (X, Y, 2, E+1, A)
+        Learned action-value table.
+    events_log_path : str or pathlib.Path, optional
+        Path to the run's ``events.log``, for visitation-aware energy
+        selection (see :func:`derive_policy_from_Q`; the compact
+        ``visitation_counts.npy`` artifact is preferred when present).
+    default_energy : int, optional
+        Fallback energy level; defaults to half of ``max_energy``.
+
+    Returns
+    -------
+    V : ndarray of shape (X, Y, 2), dtype=float64
+        ``max_a Q[x, y, k, e*, a]`` for the selected energy row ``e*``.
+    policy : ndarray of shape (X, Y, 2), dtype=int64
+        ``argmax_a`` of the same row.
+    """
+    n_x, n_y, n_k, n_e, n_a = Q.shape
+    if default_energy is None:
+        default_energy = n_e // 2
+    default_energy = int(np.clip(default_energy, 0, n_e - 1))
+
+    trained_mask = np.any(Q != 0.0, axis=-1)  # shape (X, Y, 2, E)
+
+    visitation = None
+    if events_log_path is not None:
+        visitation = _load_or_count_visitation(events_log_path, (n_x, n_y, n_k, n_e))
+
+    preferred_energy = _compute_preferred_energy(Q, visitation, default_energy)
+
+    V = np.zeros((n_x, n_y, n_k), dtype=np.float64)
+    policy = np.zeros((n_x, n_y, n_k), dtype=np.int64)
+
+    for x in range(n_x):
+        for y in range(n_y):
+            for k in range(n_k):
+                trained_here = trained_mask[x, y, k]
+                if not trained_here.any():
+                    # No trained row anywhere for this position/key
+                    # state: nothing learned to report (see Notes on
+                    # derive_policy_from_Q).
+                    continue
+                pref_e = int(preferred_energy[x, y, k])
+                trained_energies = np.flatnonzero(trained_here)
+                nearest_e = trained_energies[
+                    np.argmin(np.abs(trained_energies - pref_e))
+                ]
+                row = Q[x, y, k, nearest_e]
+                policy[x, y, k] = int(np.argmax(row))
+                V[x, y, k] = float(np.max(row))
+
+    return V, policy
 
 
 def save_derived_policy(

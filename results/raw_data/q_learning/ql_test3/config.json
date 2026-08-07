@@ -1,0 +1,18 @@
+{
+  "student_id": "40416144",
+  "base_seed": 4,
+  "maze_size": 15,
+  "map_name": "source",
+  "alpha": 0.2,
+  "gamma": 0.95,
+  "eps_start": 1.0,
+  "eps_end": 0.02,
+  "eps_schedule": "exponential",
+  "n_episodes": 8000,
+  "max_energy": 382,
+  "step_cap": 573,
+  "reward_version": "shaped",
+  "seed": 0,
+  "runtime_seconds": 57.130058300099336,
+  "run_id": "ql_test3"
+}

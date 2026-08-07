@@ -1,0 +1,708 @@
+{
+  "n_non_wall_positions": 191,
+  "agreement_fraction_k0": 0.8219895287958116,
+  "agreement_fraction_k1": 0.7382198952879581,
+  "n_example_disagreement_states": 152,
+  "examples": [
+    {
+      "x": 0,
+      "y": 0,
+      "k": 0,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 3,
+      "neighbors": [
+        3,
+        0,
+        3,
+        0
+      ]
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        3,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "k": 1,
+      "vi_action": "DOWN",
+      "model_free_action": "LEFT",
+      "cell": 0,
+      "neighbors": [
+        1,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "k": 0,
+      "vi_action": "DOWN",
+      "model_free_action": "RIGHT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "k": 0,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "k": 0,
+      "vi_action": "RIGHT",
+      "model_free_action": "LEFT",
+      "cell": 0,
+      "neighbors": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "k": 0,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        1,
+        1,
+        0
+      ]
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        1,
+        0,
+        0,
+        2
+      ]
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "k": 0,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "k": 0,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "k": 0,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "k": 1,
+      "vi_action": "DOWN",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "k": 1,
+      "vi_action": "DOWN",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        1,
+        1
+      ]
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "k": 0,
+      "vi_action": "UP",
+      "model_free_action": "RIGHT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "k": 0,
+      "vi_action": "UP",
+      "model_free_action": "RIGHT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "LEFT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "k": 1,
+      "vi_action": "DOWN",
+      "model_free_action": "RIGHT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "k": 0,
+      "vi_action": "DOWN",
+      "model_free_action": "RIGHT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "k": 0,
+      "vi_action": "DOWN",
+      "model_free_action": "RIGHT",
+      "cell": 2,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 2,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        2,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 7,
+      "k": 0,
+      "vi_action": "DOWN",
+      "model_free_action": "RIGHT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 7,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "k": 1,
+      "vi_action": "DOWN",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "k": 0,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        1,
+        0,
+        2
+      ]
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        1,
+        0,
+        2
+      ]
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "k": 0,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 14,
+      "k": 0,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 2,
+      "y": 14,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "UP",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "k": 0,
+      "vi_action": "DOWN",
+      "model_free_action": "RIGHT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "k": 1,
+      "vi_action": "DOWN",
+      "model_free_action": "RIGHT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "k": 0,
+      "vi_action": "DOWN",
+      "model_free_action": "LEFT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "k": 1,
+      "vi_action": "DOWN",
+      "model_free_action": "RIGHT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "k": 0,
+      "vi_action": "DOWN",
+      "model_free_action": "RIGHT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "x": 3,
+      "y": 7,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "LEFT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "k": 0,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 2,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "k": 0,
+      "vi_action": "UP",
+      "model_free_action": "LEFT",
+      "cell": 0,
+      "neighbors": [
+        2,
+        0,
+        1,
+        1
+      ]
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "k": 1,
+      "vi_action": "RIGHT",
+      "model_free_action": "DOWN",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "k": 0,
+      "vi_action": "DOWN",
+      "model_free_action": "LEFT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "k": 1,
+      "vi_action": "DOWN",
+      "model_free_action": "RIGHT",
+      "cell": 0,
+      "neighbors": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

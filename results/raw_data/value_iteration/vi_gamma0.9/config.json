@@ -1,0 +1,15 @@
+{
+  "student_id": "40416144",
+  "base_seed": 4,
+  "maze_size": 15,
+  "map_name": "source",
+  "gamma": 0.9,
+  "theta": 0.0001,
+  "max_iterations": 2000,
+  "max_energy": 382,
+  "step_cap": 573,
+  "reward_version": "shaped",
+  "n_iterations": 130,
+  "runtime_seconds": 9.298499100026675,
+  "run_id": "vi_gamma0.9"
+}
