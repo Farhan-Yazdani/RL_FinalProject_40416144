@@ -667,7 +667,6 @@ class MainWindow(QMainWindow):
         return lambda: ValueIterationSession(env, gamma, theta, max_iterations, reward_version)
 
     # -- analytics/overlay refresh (slices the real 4D arrays) -----------------
-
     def _refresh_analytics_and_overlays(self) -> None:
         session = getattr(self.controller, "_session", None)
         if session is None or self._current_env is None:
@@ -675,17 +674,98 @@ class MainWindow(QMainWindow):
         k, energy = self._current_slice()
         wall_mask = self._current_env.map_spec.grid == CellType.WALL.value
 
+        # Per-(x, y) most-visited energy index at this k, for
+        # marginalizing away the energy axis instead of showing one
+        # fixed slice -- `energy` only ever decreases along a
+        # trajectory and resets to max_energy on every episode start,
+        # so a single fixed-energy slice is usually almost entirely
+        # untrained (see backend_adapter.visitation_counts_2d /
+        # experiments.analysis.reachable_states_mask for the same
+        # observation).
+        #
+        # Only used where it's actually informative: a cell with zero
+        # visits at every energy (either because live training hasn't
+        # reached it yet, or because a *loaded* model's
+        # visitation_counts is a freshly-zeroed array -- apply_loaded_
+        # arrays in backend_adapter.py only overwrites Q/V/policy, not
+        # visitation_counts) would otherwise silently resolve to
+        # argmax==0 (the energy-depleted slice), which is almost
+        # always the least-trained one and produces a falsely-flat
+        # heatmap for a perfectly well-trained loaded Q-table. For
+        # those never-visited cells we instead take the max over the
+        # *value*/policy-defining Q itself across energy, which shows
+        # whatever the table actually learned rather than an arbitrary
+        # energy=0 default.
+        visited_mask_2d = None
+        best_energy_idx = None
+        if hasattr(session, "visitation_counts"):
+            counts_k = session.visitation_counts[:, :, k, :]
+            total_visits = counts_k.sum(axis=-1)
+            visited_mask_2d = total_visits > 0
+            if visited_mask_2d.any():
+                best_energy_idx = np.argmax(counts_k, axis=-1)
+
+        def _marginalize(arr_4d, reduce_fn):
+            """arr_4d: (X, Y, E) slice already indexed at this k."""
+            if best_energy_idx is not None:
+                by_visits = np.take_along_axis(
+                    arr_4d, best_energy_idx[..., None], axis=-1
+                ).squeeze(-1)
+                by_reduce = reduce_fn(arr_4d, axis=-1)
+                return np.where(visited_mask_2d, by_visits, by_reduce)
+            return reduce_fn(arr_4d, axis=-1)
+
         value_fn = session.value_function() if hasattr(session, "value_function") else None
         if value_fn is not None:
-            energy = min(energy, value_fn.shape[3] - 1)
-            v_slice = value_fn[:, :, k, energy]
+            v_slice = _marginalize(value_fn[:, :, k, :], np.max)
             self.analytics_panel.update_value_heatmap(v_slice)
             self.maze_canvas.set_value_overlay(v_slice)
 
         policy = session.policy() if hasattr(session, "policy") else None
         if policy is not None:
-            energy = min(energy, policy.shape[3] - 1)
-            p_slice = policy[:, :, k, energy]
+            # argmax over energy of the *value* at each cell tells us
+            # which energy's action to show, so policy display stays
+            # consistent with the value heatmap above rather than
+            # picking its own independent (possibly different) slice.
+            if value_fn is not None and best_energy_idx is not None:
+                fallback_e = np.argmax(value_fn[:, :, k, :], axis=-1)
+                chosen_e = np.where(visited_mask_2d, best_energy_idx, fallback_e)
+            elif best_energy_idx is not None:
+                chosen_e = best_energy_idx
+            else:
+                chosen_e = np.full(policy.shape[:2], min(energy, policy.shape[3] - 1), dtype=np.int64)
+            p_slice = np.take_along_axis(
+                policy[:, :, k, :], chosen_e[..., None], axis=-1
+            ).squeeze(-1)
+            self.analytics_panel.update_policy_arrows(p_slice, wall_mask)
+            self.maze_canvas.set_policy_overlay(p_slice)
+
+        if hasattr(session, "visitation_counts_2d"):
+            counts_2d = session.visitation_counts_2d(k)
+            self.analytics_panel.update_visitation_map(counts_2d)
+
+        value_fn = session.value_function() if hasattr(session, "value_function") else None
+        if value_fn is not None:
+            v_slice = _marginalize(value_fn[:, :, k, :], np.max)
+            self.analytics_panel.update_value_heatmap(v_slice)
+            self.maze_canvas.set_value_overlay(v_slice)
+
+        policy = session.policy() if hasattr(session, "policy") else None
+        if policy is not None:
+            # argmax over energy of the *value* at each cell tells us
+            # which energy's action to show, so policy display stays
+            # consistent with the value heatmap above rather than
+            # picking its own independent (possibly different) slice.
+            if value_fn is not None and best_energy_idx is not None:
+                fallback_e = np.argmax(value_fn[:, :, k, :], axis=-1)
+                chosen_e = np.where(visited_mask_2d, best_energy_idx, fallback_e)
+            elif best_energy_idx is not None:
+                chosen_e = best_energy_idx
+            else:
+                chosen_e = np.full(policy.shape[:2], min(energy, policy.shape[3] - 1), dtype=np.int64)
+            p_slice = np.take_along_axis(
+                policy[:, :, k, :], chosen_e[..., None], axis=-1
+            ).squeeze(-1)
             self.analytics_panel.update_policy_arrows(p_slice, wall_mask)
             self.maze_canvas.set_policy_overlay(p_slice)
 

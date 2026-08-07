@@ -3,6 +3,8 @@ running.md
 
 # Python bytecode cache
 __pycache__/
+archive/
+dump/
 *.pyc
 *.pyo
 TODO*

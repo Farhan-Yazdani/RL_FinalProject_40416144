@@ -139,28 +139,39 @@ class MazeGUI:
         self.font_small = pygame.font.SysFont("Arial", 12)
 
         self._time_accum = 0.0
-        self.buttons = self._build_buttons()
+        self.buttons = self.buttons = []
 
-    def _build_buttons(self):
-        """Construct the control buttons and return them as a list.
 
-        Returns
-        -------
-        list of Button
-            All interactive buttons for start/stop/resume/reset/
-            re-run, speed +/-, and the policy-overlay toggle.
-        """
-        x0 = self.grid_px + 15
-        w, h, gap = 105, 30, 8
-        buttons = []
-        buttons.append(Button((x0, 60, w, h), "Start", self.start))
-        buttons.append(Button((x0 + w + gap, 60, w, h), "Stop", self.stop))
-        buttons.append(Button((x0, 60 + h + gap, w, h), "Resume", self.resume))
-        buttons.append(Button((x0 + w + gap, 60 + h + gap, w, h), "Reset", self.reset))
-        buttons.append(Button((x0, 60 + 2 * (h + gap), w, h), "Re-run", self.rerun))
-        buttons.append(Button((x0 + w + gap, 60 + 2 * (h + gap), w, h), "Policy: Off", self.toggle_policy_overlay))
-        buttons.append(Button((x0, 60 + 3 * (h + gap), w, h), "Speed -", self.decrease_speed))
-        buttons.append(Button((x0 + w + gap, 60 + 3 * (h + gap), w, h), "Speed +", self.increase_speed))
+    def _build_buttons(self, start_y):
+        """Construct the control buttons."""
+
+        margin = 15
+        gap = 8
+        h = 34
+
+        panel_inner = PANEL_WIDTH - 2 * margin
+        w = (panel_inner - gap) // 2
+
+        x1 = self.grid_px + margin
+        x2 = x1 + w + gap
+
+        buttons = [
+            Button((x1, start_y, w, h), "Start", self.start),
+            Button((x2, start_y, w, h), "Stop", self.stop),
+
+            Button((x1, start_y + h + gap, w, h), "Resume", self.resume),
+            Button((x2, start_y + h + gap, w, h), "Reset", self.reset),
+
+            Button((x1, start_y + 2 * (h + gap), w, h), "Re-run", self.rerun),
+            Button((x2, start_y + 2 * (h + gap), w, h), "Policy: Off",
+                self.toggle_policy_overlay),
+
+            Button((x1, start_y + 3 * (h + gap), w, h), "Speed -",
+                self.decrease_speed),
+            Button((x2, start_y + 3 * (h + gap), w, h), "Speed +",
+                self.increase_speed),
+        ]
+
         return buttons
 
     # -- Controls -----------------------------------------------------
@@ -279,42 +290,76 @@ class MazeGUI:
                 pygame.draw.line(self.screen, (60, 60, 60), (cx, cy), end, 2)
 
     def _draw_panel(self):
-        """Draw the live info panel and control buttons."""
         panel_rect = pygame.Rect(self.grid_px, 0, PANEL_WIDTH, self.height)
         pygame.draw.rect(self.screen, PANEL_BG, panel_rect)
+
+        margin = 15
+        y = 15
+        line_gap = 22
 
         lines = [
             f"Mode: {self.mode}",
             f"Episode: {self.episode_count}",
             f"Step: {self.step_count}",
             f"Reward: {self.episode_reward:.1f}",
-            f"Key: {'YES' if self.state.k else 'no'}",
+            f"Key: {'YES' if self.state.k else 'No'}",
             f"Energy: {self.state.energy}/{self.env_config.max_energy}",
             f"Last event: {self.last_event.value if self.last_event else '-'}",
             f"Speed: {self.steps_per_second} steps/s",
         ]
+
         if self.recent_successes:
             rate = sum(self.recent_successes) / len(self.recent_successes)
             lines.append(f"Recent success: {rate:.0%}")
 
-        y = 10
+        # ---------- Draw info text ----------
+
         for line in lines:
-            text = self.font.render(line, True, PANEL_TEXT)
-            self.screen.blit(text, (self.grid_px + 15, y))
-            y += 20
+            txt = self.font.render(line, True, PANEL_TEXT)
+            self.screen.blit(txt, (self.grid_px + margin, y))
+            y += line_gap
 
-        self.buttons[5].label = "Policy: On" if self.show_policy_overlay else "Policy: Off"
-        for b in self.buttons:
-            b.draw(self.screen, self.font_small)
+        y += 10
 
-        # Energy bar (visual for the mandatory limited-energy feature)
-        bar_x, bar_y, bar_w, bar_h = self.grid_px + 15, self.height - 40, PANEL_WIDTH - 30, 16
-        pygame.draw.rect(self.screen, (60, 60, 60), (bar_x, bar_y, bar_w, bar_h))
-        frac = self.state.energy / max(1, self.env_config.max_energy)
-        pygame.draw.rect(self.screen, (129, 178, 154), (bar_x, bar_y, int(bar_w * frac), bar_h))
-        label = self.font_small.render("Energy", True, PANEL_TEXT)
-        self.screen.blit(label, (bar_x, bar_y - 16))
+        # ---------- Build buttons after text ----------
 
+        if not self.buttons:
+            self.buttons = self._build_buttons(y)
+
+        self.buttons[5].label = (
+            "Policy: On" if self.show_policy_overlay else "Policy: Off"
+        )
+
+        for button in self.buttons:
+            button.draw(self.screen, self.font_small)
+
+        # ---------- Energy bar ----------
+
+        bottom = self.buttons[-1].rect.bottom + 40
+
+        bar_x = self.grid_px + margin
+        bar_y = bottom
+        bar_w = PANEL_WIDTH - 2 * margin
+        bar_h = 18
+
+        pygame.draw.rect(
+            self.screen,
+            (60, 60, 60),
+            (bar_x, bar_y, bar_w, bar_h),
+        )
+
+        frac = self.state.energy / self.env_config.max_energy
+
+        pygame.draw.rect(
+            self.screen,
+            (129, 178, 154),
+            (bar_x, bar_y, int(bar_w * frac), bar_h),
+        )
+
+        txt = self.font_small.render("Energy", True, PANEL_TEXT)
+        self.screen.blit(txt, (bar_x, bar_y - 18))
+
+        
     def render(self):
         """Render one full frame (grid + panel) to the screen."""
         self.screen.fill(BG_COLOR)

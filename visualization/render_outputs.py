@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 from environments.generator import load_map, WALL
-from gui import renderer as rd
+from visualization import renderer as rd
 
 
 def main(argv=None):
