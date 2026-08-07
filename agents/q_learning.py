@@ -26,7 +26,8 @@ from environments.maze import (
     default_max_energy,
     default_step_cap,
 )
-
+from agents.policy_extraction import save_derived_policy
+ 
 
 def epsilon_greedy(Q, state: State, epsilon: float, rng: np.random.Generator) -> int:
     """Sample an action under an epsilon-greedy behavior policy.
@@ -415,7 +416,9 @@ def main(argv=None):
             )
 
     np.save(dirs["models"] / "Q.npy", Q)
-
+    events_log_path = dirs["raw_data"] / "events.log"
+    policy = save_derived_policy(Q, dirs["models"], events_log_path=events_log_path)
+ 
     success_rate_last_100 = episode_metrics["success"].tail(100).mean()
     print(
         f"Q-Learning trained for {args.n_episodes} episodes "
