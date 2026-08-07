@@ -1,0 +1,30 @@
+{
+  "student_id": "40416144",
+  "base_seed": 4,
+  "target_map": "transfer_similar",
+  "scenario": "full",
+  "beta": null,
+  "source_run_id": "ql_test3",
+  "n_episodes": 1500,
+  "alpha": 0.15,
+  "gamma": 0.95,
+  "eps_start": 0.5,
+  "eps_end": 0.02,
+  "eps_schedule": "exponential",
+  "seed": 0,
+  "max_energy": 382,
+  "run_id": "transfer_transfer_similar_full",
+  "negative_transfer_example": {
+    "x": 5,
+    "y": 5,
+    "energy": 364,
+    "greedy_action": 1,
+    "q_values": [
+      9.516568340886918,
+      41.70911485566969,
+      11.533234014980536,
+      15.94134824371131
+    ],
+    "reason": "Transferred policy greedily walks from (5,5) toward (5,6), which was open in the source map but is now a wall in the target map."
+  }
+}

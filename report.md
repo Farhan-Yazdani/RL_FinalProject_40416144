@@ -2,10 +2,10 @@
 
 **Student ID:** 40416144 · **base seed:** 4 · **maze size:** 15 × 15 · **environment:** `source`
 
-> This report covers the environment, the MDP formulation, and the three
+> This report covers the environment, the MDP formulation, the three
 > algorithms (Value Iteration, Q-Learning, SARSA(λ)) with a full
-> comparison. The transfer-learning section is written separately and
-> follows after the comparison in the final submission.
+> comparison, the transfer-learning section, and the answers to the
+> analytical questions.
 >
 > Every chart in this report is generated from the persisted run data
 > under `results/raw_data/` / `results/models/` (never retrained on the
@@ -45,9 +45,9 @@ of knowledge transfer.
 > graphical interface, heatmaps, visual policies, statistical charts, and
 > an analytical report.
 
-This document covers everything except the transfer-learning analysis and
-the GUI walk-through.
-
+This document covers the environment, the MDP formulation, the three
+algorithms, the comparison, the transfer-learning section, and the
+analytical questions.
 ## 3. Problem Definition and Maze Environment
 
 ### 3.1 The map
@@ -765,7 +765,275 @@ way during training. SARSA's on-policy values remain inflated by its own
 occasional risky exploration, which is also why its Q-values translate
 into a slightly more conservative, longer policy.
 
-## 10. Summary
+## 10. Transfer Learning (Q-Learning)
+
+### 10.1 Target environments
+
+The source environment is the `source` map used by all previous sections,
+trained with Q-Learning (`ql_test3`, 8,000 episodes, shaped reward). Two
+target maps are derived from it by the map generator
+(`python -m environments.generate_maps --student-id 40416144`):
+
+- **`transfer_similar`** — 6 of the 34 walls moved (17.6 %, within the
+  required 15–20 %), while the start `(0,0)`, key `(4,10)`, goal
+  `(14,13)`, and all seven penalty cells stay fixed. Moved walls:
+  `(6,3),(6,6),(6,11),(6,13),(9,11),(14,8)` removed;
+  `(2,11),(5,0),(5,6),(8,4),(9,10),(12,10)` added.
+- **`transfer_different`** — 14 of the 34 walls change (41.2 %, ≥ 35 %),
+  the key moves from `(4,10)` to `(4,2)`, and four new penalty cells are
+  added at `(2,4),(7,5),(9,10),(14,7)`.
+
+Both maps were validated with the deterministic BFS reachability check
+(start → key → goal) during generation. Every run below uses the same
+`max_energy = 382`, `step_cap = 573`, and shaped reward as the source run,
+so the Q-tables are shape-compatible and only their *values* transfer.
+
+### 10.2 The four scenarios
+
+All four scenarios start Q-Learning on the target map (1,500 episodes,
+α=0.15, γ=0.95, ε exponential 0.5→0.02, seed 0) from a different initial
+Q-table `Q_T^(0)`:
+
+| Scenario | `Q_T^(0)(s,a)` |
+|---|---|
+| Scratch | `0` everywhere (the baseline) |
+| Full | `Q_S(s,a)` — every entry copied unchanged |
+| Scaled | `β · Q_S(s,a)` for `β ∈ {0.25, 0.50, 0.75}` |
+| Selective | `Q_S(s,a)` only where the 4-neighborhood of `(x,y)` is wall-for-wall identical between source and target, else `0` |
+
+The scaled scenario implements `Q_T^(0)(s,a) = β·Q_S(s,a)` verbatim; the
+selective mask is built by comparing the wall/non-wall signature of each
+cell and its four neighbours
+(`transfer/transfer_learning.py`).
+
+**Reproduction:**
+
+```
+python -m transfer.transfer_learning --student-id 40416144 \
+  --source-map source --source-run-id ql_test3 \
+  --n-episodes 1500 --alpha 0.15 --gamma 0.95 \
+  --eps-schedule exponential --eps-start 0.5 --eps-end 0.02
+```
+
+### 10.3 Results: initial performance, learning speed, final performance
+
+![Transfer reward curves](./results/figures/transfer_learning/transfer_reward_curves.png)
+
+*Figure 9 — Smoothed per-episode reward (rolling 100-episode mean) for all
+six scenarios on the similar target (left) and the different target
+(right).*
+
+```
+python -m visualization.render_transfer --kind curves
+```
+
+**Similar target (`transfer_similar`):**
+
+| Scenario | Initial success (ep 0–49) | Final success (last 100) | Converges by episode (rolling-95) | Samples | Steps on success (last 100) | Reward (last 100) |
+|---|---|---|---|---|---|---|
+| Scratch | 0 % | 98 % | 843 | 270,256 | 65.1 | +192.9 |
+| Full | 100 % | 100 % | 99 | 99,732 | 58.0 | +220.3 |
+| Scaled β=0.25 | 100 % | 100 % | 99 | 97,911 | 57.4 | +223.4 |
+| Scaled β=0.5 | 98 % | 100 % | 99 | 98,962 | 58.4 | +220.2 |
+| Scaled β=0.75 | 100 % | 100 % | 99 | 98,705 | 57.2 | +218.6 |
+| Selective | 62 % | 100 % | 161 | 126,021 | 65.9 | +216.8 |
+
+Every transfer variant reaches 100 % success almost immediately, while
+scratch needs ~850 episodes — and the transferred runs need only ~100 k
+samples instead of ~270 k (2.7× fewer). Full and all three scaled variants
+also end with a *better* final policy than scratch (57–58 vs 65.1 steps,
++218 to +223 vs +192 reward): a clearly positive transfer. Selective is
+the weakest of the four (62 % initial, converges at episode 161, final
+path quality close to scratch), because only part of the source knowledge
+survives the neighborhood filter, but it still beats scratch.
+
+**Different target (`transfer_different`):**
+
+| Scenario | Initial success (ep 0–49) | Final success (last 100) | Converges by episode (rolling-95) | Samples | Steps on success (last 100) | Reward (last 100) |
+|---|---|---|---|---|---|---|
+| Scratch | 0 % | 99 % | 803 | 260,054 | 67.6 | +177.5 |
+| Full | 26 % | 100 % | 501 | 269,893 | 86.5 | +113.6 |
+| Scaled β=0.25 | 24 % | 99 % | 295 | 179,584 | 68.8 | +173.2 |
+| Scaled β=0.5 | 18 % | 100 % | 337 | 190,192 | 68.9 | +166.4 |
+| Scaled β=0.75 | 34 % | 100 % | 468 | 236,227 | 92.6 | +116.7 |
+| Selective | 6 % | 100 % | 461 | 228,962 | 86.0 | +144.3 |
+
+Here the picture inverts. Initial performance is far below the similar
+target: even *full* transfer starts at only 26 % success (the key moved,
+so the whole k=0 sub-goal structure changed), and selective starts at 6 %.
+Transfer still accelerates learning — full converges at episode 501 vs
+803 for scratch, and scaled β=0.25 at 295 with 1.4× fewer samples — but
+the *aggressive* transfers (full, β=0.75) end up with a **worse final
+policy than scratch**: 86–93 steps and +113 to +117 reward vs 67.6 steps
+and +177.5. The over-transferred, confident-but-wrong values survive the
+1,500-episode budget, so the agent converges to 100 % success along a
+longer, lower-reward path. Scaled β=0.25 is the sweet spot: it matches
+scratch's final path quality (68.8 steps, +173.2) while converging 2.7×
+faster. β=0.75 (92.6 steps) is worse than β=0.5 (68.9), showing the
+transfer-intensity axis is not monotonic.
+
+**Per-target summary** (the metrics the analytical question asks for
+separately):
+
+| Criterion | Similar target | Different target |
+|---|---|---|
+| Initial performance (best scenario) | 100 % (full, β=0.25, β=0.75) | 34 % (β=0.75) |
+| Learning speed (best scenario) | episode 99 (full / all β) | episode 295 (β=0.25) |
+| Final performance (best scenario) | 57.2 steps (β=0.75), +223.4 (β=0.25) | 68.8 steps, +173.2 (β=0.25) |
+| Negative transfer | none observed (all variants ≥ scratch) | full & β=0.75 degrade final policy |
+
+### 10.4 A concrete negative-transfer example
+
+For the different target, the transferred initialization contains a
+state where the source map's structure justified an action that the
+target map made wrong. Consider `(11, 13, k=1, e=331)` under the **full**
+transfer:
+
+| | Before transfer (Q_initial) | After 1,500 episodes (Q_final) |
+|---|---|---|
+| Q(s, UP) | 138.1 | 101.2 |
+| Q(s, DOWN) | 120.9 | 104.6 |
+| Q(s, LEFT) | 139.0 | 97.2 |
+| Q(s, RIGHT) | **171.4** | 101.4 |
+| Greedy action | RIGHT | DOWN |
+
+**The structural change:** `(11,13)` sits two cells west of the door
+corridor. In the source map the cell directly to its east, `(12,13)`, is
+open, so walking RIGHT toward the door/goal was correct and the transferred
+Q-table values RIGHT highest (171.4). In the different target a wall was
+placed at `(12,13)`, so the transferred policy's first move greedily walks
+into a wall it never encountered during source training — a textbook
+negative transfer: the Q-values are confident, but they encode the wrong
+map.
+
+**How training corrected it:** during continued training the agent hits
+that new wall repeatedly; each collision penalizes RIGHT, and its value
+falls from 171.4 to 101.4 while DOWN (104.6) becomes the argmax. The
+greedy policy now detours around the new wall instead of walking into it.
+The same pattern appears on the similar target at `(5,5,k=0,e=364)` (a
+wall added at `(5,6)`): DOWN (41.7) drops to 20.6 during training and the
+policy flips to LEFT — but there it was harmless because scratch never
+beat the transferred path anyway.
+
+Every run's `config.json` also records the `negative_transfer_example`
+state auto-detected by `find_negative_transfer_example` — for the
+different/full run it is `(5,10,k=0,e=364)`, whose transferred policy
+greedily walks UP toward `(5,9)`, another newly added wall. That
+particular energy row was never revisited in the 1,500 target episodes,
+so its Q-values are unchanged in `Q_final`; the `(11,13,k=1,e=331)`
+example above was chosen instead precisely because it also demonstrates
+the correction, which the spec requires to be shown.
+
+![Q-value change map](./results/figures/transfer_learning/qvalue_diff_transfer_different_full.png)
+
+*Figure 10 — `max_{k,e,a} |Q_after − Q_before|` per position for the full
+scenario on the different target. The hottest block (right half, x=10–14)
+is the door corridor, whose transferred values were rewritten the most by
+continued training — including the `(11,13)` example above (ΔQ=124.9), the
+second-largest change in the whole map.*
+
+```
+python -m visualization.render_transfer --kind qdiff \
+  --target transfer_different --scenario full
+```
+
+## 11. Answers to the Analytical Questions
+
+### Q1. Complete MDP and why the state preserves the Markov property
+
+The MDP is fully specified in §4.1 and §3.3: states
+`S = {(x, y, k, e)}` with `x, y ∈ [0,15)`, `k ∈ {0,1}` the key flag and
+`e ∈ {0,…,382}` the remaining energy; actions `A = {UP, DOWN, LEFT,
+RIGHT}`; the transition `P(s'|s,a)` is 0.8/0.1/0.1 over the intended and
+perpendicular moves (0.6 + wall absorption when a perpendicular move hits
+a wall), with `e` always decremented by 1; rewards are the exact
+event-based table of §4.2; `γ = 0.95`; terminal states are the goal,
+energy exhaustion, and step-cap exhaustion.
+
+The state is Markovian because every variable that affects the future is
+in it: `k` is required (the door at `(13,13)/(14,12)` only opens after the
+key — a spatial-only state cannot predict the door's behaviour), and `e`
+is required because the episode ends at `e=0` and the remaining budget
+changes the value of every continuation. Given `(x,y,k,e)` and the
+executed action, the next state is fully determined by the map and the
+known stochastic dynamics — no episode history is needed.
+
+### Q2. On-policy vs off-policy near dangerous cells
+
+Q-Learning's bootstrap is `max_{a'} Q(s', a')` regardless of the action
+the behaviour policy takes, so it learns the value of the *optimal*
+continuation (§9.7). SARSA's bootstrap is `Q(s', a')` for the action
+actually taken, so it learns the value of its *own* exploration policy.
+Near the penalty corridor this shows up in the actual runs: both
+converged policies avoid the penalty cells (entries drop to 0.44–0.52 per
+episode in the last 100), but QL's off-policy values let it learn a
+tighter route (56.9 vs 63.6 steps, §9.7), while SARSA's on-policy values
+remain inflated by its own occasional risky exploration and translate into
+a slightly more conservative, longer policy. The concrete per-step
+difference is visible in the traces of §8.2: SARSA propagates a big
+negative δ at a wall/penalty encounter back along the eligibility trace,
+which QL would have applied to the *maximizing* action instead.
+
+### Q3. Why VI needs a transition model; advantages and limitations
+
+VI computes Bellman expectations exactly from `P(s'|s,a)` and
+`R(s,a,s')`, so it needs a complete model of the environment and can
+evaluate states it will never visit — including impossible ones (the
+phantom door state `(13,13,k=0)` of §9.4, visited 0 times in training,
+still gets a correct VI value). Its price is the model itself (here the
+exact 0.8/0.1/0.1 dynamics must be known) and a full sweep over ~1.7×10^5
+states per iteration (266 sweeps, 17 s). QL/SARSA need only experience,
+update exactly the states that occur, and adapt to an unknown
+environment, but have no value for unseen states (Example 1), need many
+samples to separate near-equal actions (Example 2), and carry a
+low-bias from bootstrapping partially-trained rows (Example 3). In this
+project the two views agree on 82 % of positions and recover the same path
+quality, so the environment was implemented consistently.
+
+### Q4. Which λ gives the best balance of learning speed and stability?
+
+λ = 0.3 (§8.3). It converges only ~4 % later than one-step SARSA
+(episode 1,040 vs 1,002) and to the shortest final path (61.1 steps) with
+the same 100 % success and nearly identical reward (+208.1). λ = 0.9 is
+slower (converges at episode 2,727), costs ~1.7× the samples, and
+*degrades* the final policy (92 steps, +165.9): with long episodes the
+trace stays alive over many irrelevant states, so a late error rewrites a
+long history of unrelated decisions. Numeric evidence: the four-row table
+in §8.3 and Figure 6.
+
+### Q5. Three states where the model-free policy differs from VI
+
+Analyzed in §9.4 with the local structure of the map:
+
+1. **`(13,13,k=0)` — a never-visited phantom state.** A door cell the
+   agent cannot enter without the key; visited 0 times, so QL's row is
+   all zeros and its derived action is a meaningless argmax tie-break,
+   while VI retreats LEFT. The disagreement is a data artefact, not a
+   learned decision.
+2. **`(0,0,k=0)` — the start cell, visited 14,791 times.** VI itself is
+   nearly indifferent between RIGHT and DOWN (gap 0.14) because both
+   first steps route toward the key; QL's sampling noise tips its argmax
+   to DOWN. A flat-value tie, harmless to path quality.
+3. **`(4,10,k=1)` — the key cell, visited 19,422 times.** VI prefers
+   RIGHT toward the door; QL prefers UP. QL's absolute Q-values (~17) are
+   ~30× smaller than VI's (~637) because bootstrap targets read from
+   partially-trained energy rows; the within-row ordering is mostly
+   right, but the bias flips this decision. Systematic Q under-estimation.
+
+### Q6. Transfer: similar vs different targets
+
+Answered in §10.3 with initial performance, learning speed, and final
+performance separated per target, plus the §10.4 negative-transfer
+example. On the **similar** target every transfer variant is positive:
+100 % initial success (vs 0 % scratch), ~2.7× fewer samples, and a final
+policy slightly better than scratch. On the **different** target transfer
+is *mixed*: it always speeds learning (converges at 295–501 vs 803 for
+scratch) but aggressive transfers (full, β=0.75) end with a worse final
+policy than scratch (86–93 vs 67.6 steps), while β=0.25 matches scratch
+quality with 2.7× fewer samples — the clearest empirical statement of
+*when transfer helps and when it hurts*.
+
+## 12. Summary
 
 All three algorithms were implemented from scratch, run on the same
 map/reward/energy configuration, and validated against each other. VI
@@ -778,11 +1046,14 @@ changed the final policy (47.6 % agreement with sparse) as well as
 accelerating learning, and three concrete disagreement states show where
 model-free learning can differ from the model-based optimum — never
 visited states, flat-value ties, and systematic Q under-estimation. The
-transfer-learning section, the GUI, and the remaining analytical
-questions build on this foundation.
+transfer section shows that transferred knowledge helps most when the
+target is structurally close to the source (2.7× fewer samples, equal or
+better final policy) and can actively hurt when the map changes
+aggressively (full transfer on the different target ends 30 % worse than
+scratch), with a concrete corrected negative-transfer example in §10.4.
 
 ---
 
-*Figures 1–8 were all produced by the commands listed beside them; raw
+*Figures 1–10 were all produced by the commands listed beside them; raw
 metrics, per-run `config.json`, and the compact condensed logs are in
 `results/raw_data/`, and model arrays are in `results/models/`.*

@@ -1,0 +1,18 @@
+{
+  "student_id": "40416144",
+  "base_seed": 4,
+  "target_map": "transfer_different",
+  "scenario": "scratch",
+  "beta": null,
+  "source_run_id": "ql_test3",
+  "n_episodes": 1500,
+  "alpha": 0.15,
+  "gamma": 0.95,
+  "eps_start": 0.5,
+  "eps_end": 0.02,
+  "eps_schedule": "exponential",
+  "seed": 0,
+  "max_energy": 382,
+  "run_id": "transfer_transfer_different_scratch",
+  "negative_transfer_example": null
+}

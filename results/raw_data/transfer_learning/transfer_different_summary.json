@@ -1,0 +1,26 @@
+{
+  "transfer_transfer_different_scratch": {
+    "initial_performance": 0.0,
+    "final_performance": 0.99
+  },
+  "transfer_transfer_different_full": {
+    "initial_performance": 0.26,
+    "final_performance": 1.0
+  },
+  "transfer_transfer_different_scaled_beta0.25": {
+    "initial_performance": 0.24,
+    "final_performance": 0.99
+  },
+  "transfer_transfer_different_scaled_beta0.5": {
+    "initial_performance": 0.18,
+    "final_performance": 1.0
+  },
+  "transfer_transfer_different_scaled_beta0.75": {
+    "initial_performance": 0.34,
+    "final_performance": 1.0
+  },
+  "transfer_transfer_different_selective": {
+    "initial_performance": 0.06,
+    "final_performance": 1.0
+  }
+}
