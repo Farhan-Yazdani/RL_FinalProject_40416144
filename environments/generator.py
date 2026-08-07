@@ -56,6 +56,13 @@ CELL_NAMES = {
 MIN_OBSTACLE_FRACTION = 0.15
 MIN_PENALTY_CELLS = 5
 
+# Number of door cells guarding the goal. Any value in {1, 2, 3, 4} is
+# valid (a cell has at most 4 neighbors); doors are interchangeable --
+# holding the key, the agent may enter the goal through *any* of them,
+# not a specific one, so this is a redundant/wider chokepoint rather
+# than a multi-stage lock. See _place_special_cells / _seal_goal_behind_doors.
+DEFAULT_N_DOORS = 2
+
 
 @dataclass(frozen=True)
 class MapSpec:
@@ -79,8 +86,13 @@ class MapSpec:
         ``(x, y)`` coordinate of the start cell.
     key_pos : tuple of int
         ``(x, y)`` coordinate of the key cell.
-    door_pos : tuple of int
-        ``(x, y)`` coordinate of the closed door cell.
+    door_positions : tuple of tuple of int
+        ``(x, y)`` coordinates of every closed-door cell guarding the
+        goal (see :func:`_place_special_cells`). All doors are
+        interchangeable: once the agent holds the key, entering the
+        goal through *any* of them succeeds -- this is a redundant
+        chokepoint (a wider gate), not a multi-stage lock requiring a
+        specific sequence.
     goal : tuple of int
         ``(x, y)`` coordinate of the goal cell.
     generation_attempt : int
@@ -95,9 +107,19 @@ class MapSpec:
     grid: np.ndarray
     start: tuple
     key_pos: tuple
-    door_pos: tuple
+    door_positions: tuple
     goal: tuple
     generation_attempt: int
+
+    @property
+    def door_pos(self) -> tuple:
+        """Single "primary" door coordinate, for callers that only
+        need one representative door cell (e.g. a legacy single-door
+        assumption). Returns ``door_positions[0]``. Prefer
+        ``door_positions`` directly for anything that should account
+        for *all* doors (rendering, reachability, sealing checks).
+        """
+        return self.door_positions[0]
 
     def to_serializable(self) -> dict:
         """Convert this ``MapSpec`` to a JSON-serializable dict.
@@ -112,7 +134,7 @@ class MapSpec:
         d["grid"] = self.grid.astype(int).tolist()
         d["start"] = list(self.start)
         d["key_pos"] = list(self.key_pos)
-        d["door_pos"] = list(self.door_pos)
+        d["door_positions"] = [list(p) for p in self.door_positions]
         d["goal"] = list(self.goal)
         return d
 
@@ -139,7 +161,7 @@ class MapSpec:
             grid=np.array(d["grid"], dtype=np.int8),
             start=tuple(d["start"]),
             key_pos=tuple(d["key_pos"]),
-            door_pos=tuple(d["door_pos"]),
+            door_positions=tuple(tuple(p) for p in d["door_positions"]),
             goal=tuple(d["goal"]),
             generation_attempt=d["generation_attempt"],
         )
@@ -258,8 +280,10 @@ def bfs_reachable(
     return bool(visited[goal])
 
 
-def is_goal_sealed_behind_door(grid: np.ndarray, goal: tuple, door_pos: tuple) -> bool:
-    """Check that the door is a mandatory chokepoint guarding the goal.
+def is_goal_sealed_behind_doors(
+    grid: np.ndarray, goal: tuple, door_positions: tuple
+) -> bool:
+    """Check that the doors are a mandatory chokepoint guarding the goal.
 
     Parameters
     ----------
@@ -267,34 +291,40 @@ def is_goal_sealed_behind_door(grid: np.ndarray, goal: tuple, door_pos: tuple) -
         Cell-type grid.
     goal : tuple of int
         Goal coordinate.
-    door_pos : tuple of int
-        Door coordinate.
+    door_positions : tuple of tuple of int
+        Coordinates of every door guarding the goal.
 
     Returns
     -------
     bool
         ``True`` iff every in-bounds 4-connected neighbor of ``goal``
-        is either ``door_pos`` itself or a ``WALL`` cell -- i.e. the
-        *only* way to step onto the goal is through the door. This is
-        a pure structural check (no BFS/traversal), so it is cheap to
-        call repeatedly and works regardless of grid size or where
-        the goal sits (corner, edge, or interior all fall out of
-        :func:`_neighbors4` returning fewer/more in-bounds neighbors).
+        is either one of ``door_positions`` or a ``WALL`` cell -- i.e.
+        the *only* way to step onto the goal is through one of the
+        doors (doors are interchangeable, so any one of them
+        suffices). This is a pure structural check (no BFS/traversal),
+        so it is cheap to call repeatedly and works regardless of grid
+        size, number of doors, or where the goal sits (corner, edge,
+        or interior all fall out of :func:`_neighbors4` returning
+        fewer/more in-bounds neighbors -- e.g. a corner goal with
+        ``n_doors=2`` may have *zero* sealing walls if both of its two
+        neighbors are doors, which is still correctly "sealed" since
+        every entrance is a door).
 
     Notes
     -----
-    This is what turns the door from decorative into load-bearing:
+    This is what turns the doors from decorative into load-bearing:
     without this check, ``final_project.md``'s door mechanic could be
     satisfied by a map where the goal has other, wall-free approaches
-    that never touch the door. Used both by :func:`validate_map` (so
+    that never touch any door. Used both by :func:`validate_map` (so
     *no* map -- source or transfer target -- can ever be accepted
-    without this property) and by :func:`_seal_goal_behind_door` /
+    without this property) and by :func:`_seal_goal_behind_doors` /
     :func:`generate_transfer_target` to confirm the invariant survived
     a mutation.
     """
     size = grid.shape[0]
+    door_set = set(door_positions)
     for nb in _neighbors4(goal, size):
-        if nb == door_pos:
+        if nb in door_set:
             continue
         if grid[nb] != WALL:
             return False
@@ -306,7 +336,7 @@ def validate_map(
     start: tuple,
     key_pos: tuple,
     goal: tuple,
-    door_pos: tuple,
+    door_positions: tuple,
 ) -> bool:
     """Validate structural constraints and reachability of a candidate map.
 
@@ -320,11 +350,12 @@ def validate_map(
         Key coordinate.
     goal : tuple of int
         Goal coordinate.
-    door_pos : tuple of int
-        Door coordinate. The goal must be reachable *only* through
-        this cell (see :func:`is_goal_sealed_behind_door`) -- passed
-        explicitly (rather than re-derived) so the check is anchored
-        to whatever door position the caller actually placed.
+    door_positions : tuple of tuple of int
+        Coordinates of every door guarding the goal. The goal must be
+        reachable *only* through one of these cells (see
+        :func:`is_goal_sealed_behind_doors`) -- passed explicitly
+        (rather than re-derived) so the check is anchored to whatever
+        door positions the caller actually placed.
 
     Returns
     -------
@@ -332,14 +363,15 @@ def validate_map(
         ``True`` iff:
         (1) at least ``MIN_OBSTACLE_FRACTION`` of cells are walls,
         (2) at least ``MIN_PENALTY_CELLS`` cells are penalty cells,
-        (3) the goal is sealed behind the door (its only non-wall
-            neighbor is ``door_pos``),
-        (4) a path free of walls *and the closed door* exists
+        (3) the goal is sealed behind the doors (every non-wall
+            neighbor of goal is one of ``door_positions``),
+        (4) a path free of walls *and every closed door* exists
             start -> key_pos (the agent cannot hold the key yet, so
-            it cannot use the door as a shortcut), and
-        (5) a path free of walls, with the door passable, exists
+            it cannot use any door as a shortcut), and
+        (5) a path free of walls, with doors passable, exists
             key_pos -> goal (the agent holds the key by this point,
-            so the one legitimate route through the door must exist).
+            so at least one legitimate route through a door must
+            exist).
 
     Notes
     -----
@@ -363,7 +395,7 @@ def validate_map(
     if n_penalty < MIN_PENALTY_CELLS:
         return False
 
-    if not is_goal_sealed_behind_door(grid, goal, door_pos):
+    if not is_goal_sealed_behind_doors(grid, goal, door_positions):
         return False
 
     if not bfs_reachable(grid, start, key_pos, door_passable=False):
@@ -374,8 +406,10 @@ def validate_map(
     return True
 
 
-def _place_special_cells(grid: np.ndarray, rng: np.random.Generator) -> dict:
-    """Pick and stamp start/key/door/goal onto ``grid`` (mutates and returns coords).
+def _place_special_cells(
+    grid: np.ndarray, rng: np.random.Generator, n_doors: int = DEFAULT_N_DOORS
+) -> dict:
+    """Pick and stamp start/key/doors/goal onto ``grid`` (mutates and returns coords).
 
     Parameters
     ----------
@@ -384,24 +418,36 @@ def _place_special_cells(grid: np.ndarray, rng: np.random.Generator) -> dict:
         ``WALL`` and everything else as ``NORMAL``.
     rng : numpy.random.Generator
         Seeded generator used for all random placement choices.
+    n_doors : int, default=DEFAULT_N_DOORS
+        Number of door cells to place around the goal. Must be
+        between 1 and 4 inclusive (a cell has at most 4 neighbors).
 
     Returns
     -------
     dict or None
-        ``None`` if no viable door placement exists for this
-        candidate (goal has no free neighbor to serve as a real
-        chokepoint) -- the caller must discard the candidate and
-        retry with the next deterministic seed rather than falling
-        back to some unrelated cell, since a "door" that isn't
-        actually adjacent to the goal cannot later be turned into a
-        structural chokepoint by :func:`_seal_goal_behind_door`.
+        ``None`` if fewer than ``n_doors`` free neighbors of the goal
+        are available for this candidate -- the caller must discard
+        the candidate and retry with the next deterministic seed
+        rather than silently placing fewer doors than requested
+        (which would make the door count inconsistent across runs) or
+        falling back to some unrelated cell (which used to produce a
+        fake "door" that wasn't even adjacent to the goal).
         Otherwise, a dict with keys ``"start"``, ``"key_pos"``,
-        ``"door_pos"``, ``"goal"``, each an ``(x, y)`` tuple. The door
-        is a genuine free neighbor of the goal (so "passing through
-        the door" is a real, enforced final gate -- see
-        :func:`_seal_goal_behind_door`), and the key is placed in the
-        opposite half of the grid from the start to force traversal.
+        ``"door_positions"`` (a tuple of ``n_doors`` coordinates),
+        ``"goal"``. Every door is a genuine free neighbor of the goal
+        (so "passing through a door" is a real, enforced final gate --
+        see :func:`_seal_goal_behind_doors`), and the key is placed in
+        the opposite half of the grid from the start to force
+        traversal.
+
+    Raises
+    ------
+    ValueError
+        If ``n_doors`` is not in ``{1, 2, 3, 4}``.
     """
+    if not 1 <= n_doors <= 4:
+        raise ValueError(f"n_doors must be between 1 and 4, got {n_doors}")
+
     size = grid.shape[0]
     free_mask = grid == NORMAL
     free_cells = list(zip(*np.where(free_mask)))
@@ -415,27 +461,44 @@ def _place_special_cells(grid: np.ndarray, rng: np.random.Generator) -> dict:
     # bias key/goal toward being spatially separated from it.
     free_cells.sort(key=lambda c: c[0] + c[1])
     start = free_cells[0]
-    goal = free_cells[-1]
 
-    # Door: must be a genuine free neighbor of goal, since the door is
-    # about to become the *only* way onto the goal (see
-    # _seal_goal_behind_door). If goal happens to have no free
-    # neighbor at all (e.g. it landed against a cluster of walls or
-    # the grid border on a corner), there is no way to make the door
-    # a real chokepoint for this candidate -- signal failure so the
-    # deterministic regeneration loop in generate_map/
-    # generate_transfer_target draws a new candidate instead of
-    # silently placing a decorative door far from the goal.
-    door_pos = None
-    for nb in _neighbors4(goal, size):
-        if grid[nb] == NORMAL and nb != start:
-            door_pos = nb
-            break
-    if door_pos is None:
+    # Goal: pick the farthest-from-start cell that structurally has
+    # *at least* n_doors neighbors (a corner has 2, an edge has 3, an
+    # interior cell has 4 -- see _neighbors4). Without this filter the
+    # plain "farthest cell" heuristic below almost always lands on a
+    # grid corner (2 neighbors), which makes n_doors > 2 impossible
+    # for essentially every seed -- wasting the entire regeneration
+    # budget rather than just picking a slightly less extreme goal
+    # cell that can actually support the requested door count.
+    goal_candidates = [
+        c
+        for c in reversed(free_cells)
+        if c != start and sum(1 for _ in _neighbors4(c, size)) >= n_doors
+    ]
+    if not goal_candidates:
         return None
+    goal = goal_candidates[0]
+
+    # Doors: must be genuine free neighbors of goal, since they are
+    # about to become the *only* way onto the goal (see
+    # _seal_goal_behind_doors). Deterministic order comes from
+    # _neighbors4 plus the already-shuffled free_cells, so this is
+    # reproducible given the seed. If goal doesn't have at least
+    # n_doors free neighbors (e.g. it landed against a cluster of
+    # walls, in a corner with n_doors > 2, or on an edge with
+    # n_doors > 3), there is no way to place exactly n_doors real
+    # chokepoint doors for this candidate -- signal failure so the
+    # deterministic regeneration loop in generate_map/
+    # generate_transfer_target draws a new candidate instead.
+    door_positions = tuple(
+        nb for nb in _neighbors4(goal, size) if grid[nb] == NORMAL and nb != start
+    )[:n_doors]
+    if len(door_positions) < n_doors:
+        return None
+    door_set = set(door_positions)
 
     remaining = [
-        c for c in free_cells if c not in (start, goal, door_pos)
+        c for c in free_cells if c != start and c != goal and c not in door_set
     ]
     # Key roughly in the middle third of the sorted-by-distance list,
     # so it typically requires real traversal from start but isn't
@@ -445,36 +508,37 @@ def _place_special_cells(grid: np.ndarray, rng: np.random.Generator) -> dict:
 
     grid[start] = START
     grid[key_pos] = KEY
-    grid[door_pos] = DOOR
+    for d in door_positions:
+        grid[d] = DOOR
     grid[goal] = GOAL
 
     return {
         "start": start,
         "key_pos": key_pos,
-        "door_pos": door_pos,
+        "door_positions": door_positions,
         "goal": goal,
     }
 
 
-def _seal_goal_behind_door(
+def _seal_goal_behind_doors(
     grid: np.ndarray,
     goal: tuple,
-    door_pos: tuple,
+    door_positions: tuple,
     start: tuple,
     key_pos: tuple,
 ) -> bool:
-    """Wall off every neighbor of ``goal`` except ``door_pos``, in place.
+    """Wall off every neighbor of ``goal`` except ``door_positions``, in place.
 
     Parameters
     ----------
     grid : ndarray of shape (size, size)
         Grid to mutate in place. Assumed to already have ``start``,
-        ``key_pos``, ``door_pos``, and ``goal`` stamped in.
+        ``key_pos``, ``door_positions``, and ``goal`` stamped in.
     goal : tuple of int
         Goal coordinate.
-    door_pos : tuple of int
-        Door coordinate; must already be a 4-connected neighbor of
-        ``goal`` (guaranteed by :func:`_place_special_cells`).
+    door_positions : tuple of tuple of int
+        Door coordinates; each must already be a 4-connected neighbor
+        of ``goal`` (guaranteed by :func:`_place_special_cells`).
     start : tuple of int
         Start coordinate; protected from being overwritten.
     key_pos : tuple of int
@@ -484,28 +548,32 @@ def _seal_goal_behind_door(
     -------
     bool
         ``True`` if sealing succeeded. ``False`` if ``start`` or
-        ``key_pos`` happens to be a neighbor of ``goal`` other than
-        the door -- in that case the goal cannot be sealed without
-        destroying a protected cell, so the caller must discard this
-        candidate and regenerate rather than silently overwrite
-        ``start``/``key_pos`` or silently leave a gap in the seal.
+        ``key_pos`` happens to be a neighbor of ``goal`` that isn't
+        one of ``door_positions`` -- in that case the goal cannot be
+        sealed without destroying a protected cell, so the caller must
+        discard this candidate and regenerate rather than silently
+        overwrite ``start``/``key_pos`` or silently leave a gap in the
+        seal.
 
     Notes
     -----
-    This function is what makes the door a *mandatory* chokepoint
-    (per the consult request) rather than "just one normal cell among
-    the goal's neighbors." It works uniformly regardless of maze
-    size or where the goal landed (corner/edge/interior all fall out
-    of :func:`_neighbors4` naturally returning 2/3/4 neighbors), and
-    it is idempotent -- calling it again on an already-sealed goal is
-    a no-op other than re-asserting existing walls, which
+    This function is what makes the doors a *mandatory* chokepoint
+    rather than "just normal cells among the goal's neighbors." It
+    works uniformly regardless of maze size, number of doors, or
+    where the goal landed (corner/edge/interior all fall out of
+    :func:`_neighbors4` naturally returning 2/3/4 neighbors -- e.g. a
+    corner goal with ``n_doors=2`` has nothing left to wall, which is
+    correct: every entrance is already a door). It is idempotent --
+    calling it again on an already-sealed goal is a no-op other than
+    re-asserting existing walls, which
     :func:`generate_transfer_target` relies on as a post-mutation
     safety net.
     """
     size = grid.shape[0]
+    door_set = set(door_positions)
     to_wall = []
     for nb in _neighbors4(goal, size):
-        if nb == door_pos:
+        if nb in door_set:
             continue
         if nb == start or nb == key_pos:
             return False
@@ -515,7 +583,9 @@ def _seal_goal_behind_door(
     return True
 
 
-def _generate_candidate(size: int, rng: np.random.Generator) -> tuple:
+def _generate_candidate(
+    size: int, rng: np.random.Generator, n_doors: int = DEFAULT_N_DOORS
+) -> tuple:
     """Draw one random candidate grid + special cells (not yet validated).
 
     Parameters
@@ -524,16 +594,18 @@ def _generate_candidate(size: int, rng: np.random.Generator) -> tuple:
         Grid side length.
     rng : numpy.random.Generator
         Seeded generator for this attempt.
+    n_doors : int, default=DEFAULT_N_DOORS
+        Number of door cells to place around the goal.
 
     Returns
     -------
     grid : ndarray of shape (size, size), or None
         Candidate grid with walls, penalties, and special cells
-        stamped in, with the goal sealed behind the door. ``None`` if
-        this candidate could not produce a viable door placement or
-        could not be sealed without overwriting ``start``/``key_pos``
-        (see :func:`_place_special_cells` and
-        :func:`_seal_goal_behind_door`) -- the caller (``generate_map``
+        stamped in, with the goal sealed behind the doors. ``None`` if
+        this candidate could not produce ``n_doors`` viable door
+        placements or could not be sealed without overwriting
+        ``start``/``key_pos`` (see :func:`_place_special_cells` and
+        :func:`_seal_goal_behind_doors`) -- the caller (``generate_map``
         / ``generate_transfer_target``) must treat this the same as a
         failed :func:`validate_map` call and move on to the next
         deterministic attempt.
@@ -562,12 +634,16 @@ def _generate_candidate(size: int, rng: np.random.Generator) -> tuple:
         x, y = int(i % size), int(i // size)
         grid[x, y] = PENALTY
 
-    coords = _place_special_cells(grid, rng)
+    coords = _place_special_cells(grid, rng, n_doors=n_doors)
     if coords is None:
         return None, None
 
-    sealed = _seal_goal_behind_door(
-        grid, coords["goal"], coords["door_pos"], coords["start"], coords["key_pos"]
+    sealed = _seal_goal_behind_doors(
+        grid,
+        coords["goal"],
+        coords["door_positions"],
+        coords["start"],
+        coords["key_pos"],
     )
     if not sealed:
         return None, None
@@ -579,6 +655,7 @@ def generate_map(
     student_id: str,
     name: str = "source",
     max_attempts: int = 200,
+    n_doors: int = DEFAULT_N_DOORS,
 ) -> MapSpec:
     """Deterministically generate a BFS-validated map for ``student_id``.
 
@@ -592,6 +669,11 @@ def generate_map(
         returned :class:`MapSpec`.
     max_attempts : int, default=200
         Maximum deterministic regeneration attempts before raising.
+    n_doors : int, default=DEFAULT_N_DOORS
+        Number of interchangeable door cells to place around the
+        goal. Must be between 1 and 4. Larger values are stricter
+        (more free neighbors of the goal are required), so they may
+        need more regeneration attempts -- see :func:`_place_special_cells`.
 
     Returns
     -------
@@ -615,14 +697,18 @@ def generate_map(
 
     for attempt in range(max_attempts):
         rng = np.random.default_rng(base_seed * 10_000 + attempt)
-        grid, coords = _generate_candidate(maze_size, rng)
+        grid, coords = _generate_candidate(maze_size, rng, n_doors=n_doors)
         if grid is None:
-            # This attempt couldn't place a real door-neighbor for the
-            # goal, or couldn't seal it without overwriting start/key
-            # -- discard and try the next deterministic seed.
+            # This attempt couldn't place n_doors real door-neighbors
+            # for the goal, or couldn't seal it without overwriting
+            # start/key -- discard and try the next deterministic seed.
             continue
         if validate_map(
-            grid, coords["start"], coords["key_pos"], coords["goal"], coords["door_pos"]
+            grid,
+            coords["start"],
+            coords["key_pos"],
+            coords["goal"],
+            coords["door_positions"],
         ):
             return MapSpec(
                 name=name,
@@ -632,7 +718,7 @@ def generate_map(
                 grid=grid,
                 start=coords["start"],
                 key_pos=coords["key_pos"],
-                door_pos=coords["door_pos"],
+                door_positions=coords["door_positions"],
                 goal=coords["goal"],
                 generation_attempt=attempt,
             )
@@ -746,13 +832,15 @@ def generate_transfer_target(
     size = source.maze_size
 
     # The walls immediately guarding the goal (every neighbor of goal
-    # except the door) are what make the door a mandatory chokepoint
-    # (see _seal_goal_behind_door). They must never be candidates for
-    # relocation here, or a "similar"/"different" target could
-    # silently reopen an alternate route onto the goal that bypasses
-    # the door entirely.
+    # that isn't one of source.door_positions) are what make the
+    # doors a mandatory chokepoint (see _seal_goal_behind_doors). They
+    # must never be candidates for relocation here, or a
+    # "similar"/"different" target could silently reopen an alternate
+    # route onto the goal that bypasses every door entirely.
     goal_seal_neighbors = {
-        nb for nb in _neighbors4(source.goal, size) if nb != source.door_pos
+        nb
+        for nb in _neighbors4(source.goal, size)
+        if nb not in source.door_positions
     }
 
     for attempt in range(max_attempts):
@@ -782,7 +870,9 @@ def generate_transfer_target(
         # cleared cell can be immediately re-selected as a "new" wall
         # position, silently turning a move into a no-op and making
         # the realized change_fraction lower than requested.
-        protected = {source.start, source.key_pos, source.door_pos, source.goal}
+        protected = {source.start, source.key_pos, source.goal} | set(
+            source.door_positions
+        )
         excluded = protected | set(cells_to_clear)
         free_mask = grid == NORMAL
         free_coords = [
@@ -819,10 +909,12 @@ def generate_transfer_target(
         # relocate the goal itself -- in which case it correctly
         # signals failure (via the start/key_pos check) instead of
         # producing a target map with an unsealed goal.
-        if not _seal_goal_behind_door(grid, goal, source.door_pos, source.start, key_pos):
+        if not _seal_goal_behind_doors(
+            grid, goal, source.door_positions, source.start, key_pos
+        ):
             continue
 
-        if validate_map(grid, source.start, key_pos, goal, source.door_pos):
+        if validate_map(grid, source.start, key_pos, goal, source.door_positions):
             return MapSpec(
                 name=name,
                 student_id=source.student_id,
@@ -831,7 +923,7 @@ def generate_transfer_target(
                 grid=grid,
                 start=source.start,
                 key_pos=key_pos,
-                door_pos=source.door_pos,
+                door_positions=source.door_positions,
                 goal=goal,
                 generation_attempt=attempt,
             )

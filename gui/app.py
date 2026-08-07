@@ -46,7 +46,11 @@ from gui.backend_adapter import (
     QLearningSession,
     SarsaLambdaSession,
     ValueIterationSession,
+    apply_loaded_arrays,
     build_environment,
+    list_model_run_ids,
+    load_model_arrays,
+    load_run_config,
 )
 from gui.controller import SimulationController
 from gui.models import AlgorithmName, CellType, LiveStats, MapName, RunMode
@@ -55,6 +59,8 @@ from gui.renderer import MazeCanvas
 
 class MainWindow(QMainWindow):
     """Top-level window wiring controls, the controller, and both frames."""
+
+    _NO_MODEL_SENTINEL = "None (train fresh)"
 
     def __init__(self) -> None:
         super().__init__()
@@ -144,9 +150,18 @@ class MainWindow(QMainWindow):
         grid.addWidget(QLabel("Reward:"), 4, 0)
         grid.addWidget(self.reward_version_combo, 4, 1)
 
+        self.learned_model_combo = QComboBox()
+        grid.addWidget(QLabel("Learned Model:"), 5, 0)
+        grid.addWidget(self.learned_model_combo, 5, 1)
+
+        refresh_models_btn = QPushButton("Refresh model list")
+        refresh_models_btn.clicked.connect(self._refresh_learned_model_list)
+        grid.addWidget(refresh_models_btn, 6, 0, 1, 2)
+
         apply_btn = QPushButton("Build / Apply")
         apply_btn.clicked.connect(self._on_apply_clicked)
-        grid.addWidget(apply_btn, 5, 0, 1, 2)
+        grid.addWidget(apply_btn, 7, 0, 1, 2)
+        self._refresh_learned_model_list()
         return box
 
     def _build_hyperparam_group(self) -> QGroupBox:
@@ -375,6 +390,31 @@ class MainWindow(QMainWindow):
     def _on_algorithm_changed(self, name: str) -> None:
         is_sarsa = name == AlgorithmName.SARSA_LAMBDA.value
         self.lambda_edit.setEnabled(is_sarsa)
+        self._refresh_learned_model_list()
+
+    def _refresh_learned_model_list(self) -> None:
+        """Repopulate the "Learned Model" dropdown from disk.
+
+        Notes
+        -----
+        Scans ``results/models/<current algorithm>/`` only (via
+        :func:`gui.backend_adapter.list_model_run_ids`) -- called
+        whenever the Algorithm dropdown changes (different algorithms
+        have different available runs) and via the "Refresh model
+        list" button, since new runs can appear on disk while the GUI
+        is already open (e.g. a batch script finishing in another
+        terminal).
+        """
+        algo = self.algo_combo.currentText()
+        previous = self.learned_model_combo.currentText()
+        self.learned_model_combo.blockSignals(True)
+        self.learned_model_combo.clear()
+        self.learned_model_combo.addItem(self._NO_MODEL_SENTINEL)
+        for run_id in list_model_run_ids(algo):
+            self.learned_model_combo.addItem(run_id)
+        restored = self.learned_model_combo.findText(previous)
+        self.learned_model_combo.setCurrentIndex(restored if restored >= 0 else 0)
+        self.learned_model_combo.blockSignals(False)
 
     def _on_slice_changed(self, *_args) -> None:
         self._refresh_analytics_and_overlays()
@@ -391,6 +431,14 @@ class MainWindow(QMainWindow):
         return (1 if self.key_held_checkbox.isChecked() else 0, self.energy_spinbox.value())
 
     def _on_apply_clicked(self) -> None:
+        learned_selection = self.learned_model_combo.currentText()
+        if learned_selection and learned_selection != self._NO_MODEL_SENTINEL:
+            self._apply_learned_model(learned_selection)
+            return
+
+        # Fresh build: re-enable Train in case a previous Apply loaded
+        # a model and forced Eval-only.
+        self.train_radio.setEnabled(True)
         try:
             env = build_environment(BackendConfig(
                 student_id=self.student_id_edit.text().strip(),
@@ -417,6 +465,184 @@ class MainWindow(QMainWindow):
         self.controller.set_session(session, factory, is_vi)
         self.maze_canvas.clear_path_trace()
         self._refresh_analytics_and_overlays()
+
+    def _apply_learned_model(self, run_id: str) -> None:
+        """Load a previously-completed batch run and drive it in eval mode.
+
+        Parameters
+        ----------
+        run_id : str
+            Selected entry from the "Learned Model" dropdown (a
+            sub-directory name under ``results/models/<algorithm>/``).
+
+        Notes
+        -----
+        Data sources: the learned arrays themselves
+        (``V``/``policy``/``Q``) come **only** from
+        ``results/models/<algorithm>/<run_id>/*.npy``. Determining
+        *which map* and *which hyperparameters* to rebuild the
+        environment with -- needed both to get a shape-compatible
+        session and to populate the sidebar fields as requested --
+        additionally requires
+        ``results/raw_data/<algorithm>/<run_id>/config.json``; see
+        ``gui.backend_adapter.load_run_config``'s docstring for why
+        that's structurally unavoidable rather than a shortcut.
+        """
+        algo = self.algo_combo.currentText()
+        config = load_run_config(algo, run_id)
+        if config is None:
+            QMessageBox.critical(
+                self, "Missing run config",
+                f"No results/raw_data/{algo}/{run_id}/config.json found. "
+                f"Without it there's no record of which map or "
+                f"hyperparameters produced this model, so it can't be "
+                f"safely loaded."
+            )
+            return
+
+        self._populate_fields_from_config(config)
+
+        try:
+            env = build_environment(BackendConfig(
+                student_id=self.student_id_edit.text().strip(),
+                map_name=self.env_combo.currentText(),
+                maps_dir=self.maps_dir_edit.text().strip(),
+                reward_version=self.reward_version_combo.currentText(),
+                max_energy=config.get("max_energy"),
+            ))
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Failed to build environment", str(exc))
+            return
+
+        arrays = load_model_arrays(algo, run_id)
+        q_or_v = arrays.get("Q", arrays.get("V"))
+        if q_or_v is None:
+            QMessageBox.critical(self, "No saved arrays",
+                                  f"results/models/{algo}/{run_id}/ has no .npy files.")
+            return
+        expected_energy_dim = env.config.max_energy + 1
+        if (q_or_v.shape[0] != env.map_spec.maze_size
+                or q_or_v.shape[1] != env.map_spec.maze_size
+                or q_or_v.shape[3] != expected_energy_dim):
+            QMessageBox.critical(
+                self, "Shape mismatch",
+                f"Loaded array shape {q_or_v.shape} doesn't match the "
+                f"rebuilt environment (maze_size={env.map_spec.maze_size}, "
+                f"max_energy+1={expected_energy_dim}). config.json may be "
+                f"missing max_energy, or the map file has changed since "
+                f"this run was trained."
+            )
+            return
+
+        self._current_env = env
+        self.energy_spinbox.setMaximum(env.config.max_energy)
+        self.energy_spinbox.setValue(env.config.max_energy)
+
+        factory = self._make_import_factory(env, algo, run_id)
+        try:
+            session = factory()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Failed to load model", str(exc))
+            return
+
+        is_vi = algo == AlgorithmName.VALUE_ITERATION.value
+        self.controller.set_session(session, factory, is_vi)
+        self.maze_canvas.clear_path_trace()
+
+        # A loaded model replays a fixed, already-learned policy -- it
+        # doesn't continue training live, so Train is disabled rather
+        # than just defaulting to Eval (which the user could otherwise
+        # switch off).
+        self.eval_radio.setChecked(True)
+        self.train_radio.setEnabled(False)
+        self.controller.set_mode(RunMode.EVAL)
+
+        # Surface the policy immediately instead of requiring the user
+        # to manually enable both overlays after every import.
+        self.policy_overlay_checkbox.setChecked(True)
+        self.value_overlay_checkbox.setChecked(True)
+
+        self._refresh_analytics_and_overlays()
+        self.status_label.setText(
+            f"Loaded {algo}/{run_id} (eval only -- replays the learned policy)."
+        )
+
+    def _populate_fields_from_config(self, config: dict) -> None:
+        """Set sidebar fields to the values recorded in a run's config.json.
+
+        Parameters
+        ----------
+        config : dict
+            Output of ``gui.backend_adapter.load_run_config``. Only
+            keys actually present are applied, so this works
+            unchanged across the differently-shaped configs written by
+            each of the three batch scripts.
+        """
+        if "student_id" in config:
+            self.student_id_edit.setText(str(config["student_id"]))
+        if "map_name" in config:
+            idx = self.env_combo.findText(config["map_name"])
+            if idx >= 0:
+                self.env_combo.setCurrentIndex(idx)
+        if "reward_version" in config:
+            idx = self.reward_version_combo.findText(config["reward_version"])
+            if idx >= 0:
+                self.reward_version_combo.setCurrentIndex(idx)
+        if "alpha" in config:
+            self.alpha_edit.setText(str(config["alpha"]))
+        if "gamma" in config:
+            self.gamma_edit.setText(str(config["gamma"]))
+        if "eps_start" in config:
+            self.eps_start_edit.setText(str(config["eps_start"]))
+        if "eps_end" in config:
+            self.eps_end_edit.setText(str(config["eps_end"]))
+        if "eps_schedule" in config:
+            idx = self.eps_schedule_combo.findText(config["eps_schedule"])
+            if idx >= 0:
+                self.eps_schedule_combo.setCurrentIndex(idx)
+        if "lambda" in config:
+            self.lambda_edit.setText(str(config["lambda"]))
+        if "n_episodes" in config:
+            self.total_episodes_edit.setText(str(config["n_episodes"]))
+        if "theta" in config:
+            self.theta_edit.setText(str(config["theta"]))
+        if "max_iterations" in config:
+            self.max_iterations_edit.setText(str(config["max_iterations"]))
+
+    def _make_import_factory(self, env, algorithm: str, run_id: str):
+        """Build a zero-arg factory that (re)builds an imported-model session.
+
+        Parameters
+        ----------
+        env : environments.maze.MazeEnv
+            Already-built, shape-matching environment.
+        algorithm : str
+            Which session type to build.
+        run_id : str
+            Which saved run to load arrays from.
+
+        Returns
+        -------
+        callable
+            Reuses :meth:`_make_session_factory` (so it picks up
+            whatever's currently in the hyperparameter fields --
+            already synced to the loaded run's config by
+            :meth:`_apply_learned_model`) to construct a normal,
+            zero-initialized session, then immediately overwrites its
+            arrays with a *freshly reloaded* copy from disk. This is
+            what makes Reset/Re-run on an imported model restart the
+            eval rollout from scratch while keeping the exact same
+            learned policy, rather than reverting to a blank Q-table.
+        """
+        base_factory = self._make_session_factory(env)
+
+        def factory():
+            session = base_factory()
+            arrays = load_model_arrays(algorithm, run_id)
+            apply_loaded_arrays(session, algorithm, arrays)
+            return session
+
+        return factory
 
     def _make_session_factory(self, env):
         algo = self.algo_combo.currentText()
